@@ -1,2 +1,2 @@
-# condapaths
-Extract condo-related paths from wrstat stats.gz files
+# stats-parse
+wrstat stats.gz parser
