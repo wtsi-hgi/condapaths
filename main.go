@@ -23,6 +23,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -34,14 +35,22 @@ import (
 	"time"
 )
 
-const statsFileSuffix = ".stats.gz"
+const (
+	statsFileSuffix         = ".stats.gz"
+	condarcSuffix           = ".condarc"
+	condaMetaOutputSuffix   = ".conda-meta"
+	condaMetaSuffix         = "/conda-meta/history"
+	singularityOutputSuffix = ".singularity"
+)
+
+var singularitySuffixes = []string{".sif", ".simg", ".img"}
 
 const helpText = `condapaths parses wrstat stats.gz files quickly, in low mem.
 
 Provide a directory as an argument and it will parse the most recent stats.gz
 file inside.
 
-It outputs files with one quoted path per line:
+It outputs files with one path per line:
 * <date>.condarc: paths where the file basename was ".condarc"
 * <date>.conda-meta: paths where the file basename was "history", in a directory
                      named "conda-meta"
@@ -79,7 +88,11 @@ func main() {
 
 	defer cleanup()
 
-	parseStats(input, date)
+	err = parseStats(input, date)
+	if err != nil {
+		cleanup()
+		die(err)
+	}
 }
 
 // exitHelp prints help text and exits 0, unless a message is passed in which
@@ -147,24 +160,66 @@ func decompress(path string) (io.ReadCloser, func() error, error) {
 	return stdout, cleanup, nil
 }
 
-func parseStats(in io.ReadCloser, date string) {
+func parseStats(in io.ReadCloser, date string) error {
+	defer in.Close()
+
+	rcOut, err := os.Create(date + condarcSuffix)
+	if err != nil {
+		return err
+	}
+
+	defer rcOut.Close()
+
+	cmOut, err := os.Create(date + condaMetaOutputSuffix)
+	if err != nil {
+		return err
+	}
+
+	defer cmOut.Close()
+
+	smOut, err := os.Create(date + singularityOutputSuffix)
+	if err != nil {
+		return err
+	}
+
+	defer smOut.Close()
+
 	p := NewStatsParser(in)
 
-	lines := 0
+	condarcSuffixBytes := []byte(condarcSuffix)
+	condaMetaSuffixBytes := []byte(condaMetaSuffix)
+	singularitySuffixesBytes := make([][]byte, len(singularitySuffixes))
+	for i, suffix := range singularitySuffixes {
+		singularitySuffixesBytes[i] = []byte(suffix)
+	}
 
 	for p.Scan() {
-		lines++
+		if p.EntryType != fileType {
+			continue
+		}
 
-		if lines == 1 {
-			l.Printf("got path %s\n", p.Path)
+		switch {
+		case bytes.HasSuffix(p.Path, condarcSuffixBytes):
+			if _, err := rcOut.Write(append(p.Path, '\n')); err != nil {
+				return err
+			}
+		case bytes.HasSuffix(p.Path, condaMetaSuffixBytes):
+			if _, err := cmOut.Write(append(p.Path, '\n')); err != nil {
+				return err
+			}
+		default:
+			for _, suffix := range singularitySuffixesBytes {
+				if bytes.HasSuffix(p.Path, suffix) {
+					if _, err := smOut.Write(append(p.Path, '\n')); err != nil {
+						return err
+					}
+					break
+				}
+			}
 		}
 	}
 
-	l.Printf("Parsed %d lines from %s file\n", lines, date)
-
-	if p.Err() != nil {
-		die(p.Err())
-	}
+	return p.Err()
 }
 
 func die(err error) {
