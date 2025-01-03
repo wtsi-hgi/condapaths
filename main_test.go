@@ -44,7 +44,7 @@ func TestParseStats(t *testing.T) {
 
 		defer gr.Close()
 
-		p := NewStatsParser(gr)
+		p := NewStatsParser(gr, "prefix")
 		So(p, ShouldNotBeNil)
 
 		Convey("you can get extract info for all entries", func() {
@@ -66,8 +66,10 @@ func TestParseStats(t *testing.T) {
 	})
 
 	Convey("Scan generates Err() when", t, func() {
+		prefix := "prefix"
+
 		Convey("first column is not base64 encoded", func() {
-			p := NewStatsParser(strings.NewReader("this is invalid since it has spaces\t1\t1\t1\t1\t1\t1\tf\t1\t1\td\n"))
+			p := NewStatsParser(strings.NewReader("this is invalid since it has spaces\t1\t1\t1\t1\t1\t1\tf\t1\t1\td\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrBadPath)
 		})
@@ -75,40 +77,40 @@ func TestParseStats(t *testing.T) {
 		Convey("there are not enough tab separated columns", func() {
 			encodedPath := "L2x1c3RyZS9zY3JhdGNoMTIyL3RvbC90ZWFtcy9ibGF4dGVyL3VzZXJzL2FtNzUvYXNzZW1ibGllcy9kYXRhc2V0L2lsWGVzU2V4czEuMl9nZW5vbWljLmZuYQ==" //nolint:lll
 
-			p := NewStatsParser(strings.NewReader(encodedPath + "\t1\t1\t1\t1\t1\t1\tf\t1\t1\td\n"))
+			p := NewStatsParser(strings.NewReader(encodedPath+"\t1\t1\t1\t1\t1\t1\tf\t1\t1\td\n"), prefix)
 			So(p.Scan(), ShouldBeTrue)
 			So(p.Err(), ShouldBeNil)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\t1\t1\t1\t1\t1\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\t1\t1\t1\t1\t1\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\t1\t1\t1\t1\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\t1\t1\t1\t1\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\t1\t1\t1\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\t1\t1\t1\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\t1\t1\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\t1\t1\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\t1\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\t1\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
-			p = NewStatsParser(strings.NewReader(encodedPath + "\n"))
+			p = NewStatsParser(strings.NewReader(encodedPath+"\n"), prefix)
 			So(p.Scan(), ShouldBeFalse)
 			So(p.Err(), ShouldEqual, ErrTooFewColumns)
 
 			Convey("but not for blank lines", func() {
-				p = NewStatsParser(strings.NewReader("\n"))
+				p = NewStatsParser(strings.NewReader("\n"), "prefix")
 				So(p.Scan(), ShouldBeTrue)
 				So(p.Err(), ShouldBeNil)
 
-				p := NewStatsParser(strings.NewReader(""))
+				p := NewStatsParser(strings.NewReader(""), "prefix")
 				So(p.Scan(), ShouldBeFalse)
 				So(p.Err(), ShouldBeNil)
 			})
