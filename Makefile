@@ -1,4 +1,4 @@
-PKG := github.com/sb10/stats-parse
+PKG := github.com/wtsi-hgi/condapaths
 VERSION := $(shell git describe --tags --always --long --dirty)
 TAG := $(shell git describe --abbrev=0 --tags)
 LDFLAGS = -ldflags "-X ${PKG}/cmd.Version=${VERSION}"
@@ -13,9 +13,9 @@ build:
 
 install: export CGO_ENABLED = 0
 install:
-	@rm -f ${GOPATH}/bin/stats-parse
+	@rm -f ${GOPATH}/bin/condapaths
 	@go install -tags netgo ${LDFLAGS}
-	@echo installed to ${GOPATH}/bin/stats-parse
+	@echo installed to ${GOPATH}/bin/condapaths
 
 test: export CGO_ENABLED = 0
 test:
@@ -36,7 +36,7 @@ lint:
 	@golangci-lint run
 
 clean:
-	@rm -f ./stats-parse
+	@rm -f ./condapaths
 	@rm -f ./dist.zip
 
 dist: export CGO_ENABLED = 0
@@ -45,7 +45,7 @@ dist: export CGO_ENABLED = 0
 dist:
 	gopack pack --os linux --arch amd64 -o linux-dist.zip
 	github-release release --tag ${TAG} --pre-release
-	github-release upload --tag ${TAG} --name stats-parse-linux-x86-64.zip --file linux-dist.zip
-	@rm -f stats-parse linux-dist.zip
+	github-release upload --tag ${TAG} --name condapaths-linux-x86-64.zip --file linux-dist.zip
+	@rm -f condapaths linux-dist.zip
 
 .PHONY: test race bench lint build install clean dist
