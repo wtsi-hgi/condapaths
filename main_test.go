@@ -51,10 +51,10 @@ func TestParseStats(t *testing.T) {
 			i := 0
 			for p.Scan() {
 				if i == 0 {
-					So(string(p.Path), ShouldEqual, "/lustre/scratch122/tol/teams/blaxter/users/am75/assemblies/dataset/ilXesSexs1.2_genomic.fna") //nolint:lll
-					So(p.EntryType, ShouldEqual, fileType)
+					So(string(p.Path), ShouldEqual, "/lustre/scratch122") //nolint:lll
+					So(p.EntryType, ShouldEqual, dirType)
 				} else if i == 1 {
-					So(string(p.Path), ShouldEqual, "/lustre/scratch122/tol/teams/blaxter/users/am75/assemblies/dataset/ilOpeBrum1.1_genomic.fna.fai") //nolint:lll
+					So(string(p.Path), ShouldEqual, "/lustre/scratch122/tol/scratch/prefect_test/d084946a-8577-4ffe-aafd-f93ba8c704e0") //nolint:lll
 				}
 
 				i++

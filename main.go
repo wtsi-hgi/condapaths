@@ -175,6 +175,8 @@ func parseStats(in io.ReadCloser, prefix string) error {
 			continue
 		}
 
+		die(fmt.Errorf("got path %s", p.Path))
+
 		switch {
 		case bytes.HasSuffix(p.Path, condarcSuffixBytes):
 			if _, err := rcOut.Write(append(p.Path, '\n')); err != nil {

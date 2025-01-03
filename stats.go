@@ -39,12 +39,15 @@ func (e Error) Error() string { return string(e) }
 
 const (
 	fileType                   = byte('f')
+	dirType                    = byte('d')
 	maxLineLength              = 64 * 1024
 	maxBase64EncodedPathLength = 8 * 1024
 
 	ErrBadPath       = Error("invalid file format: path is not base64 encoded")
 	ErrTooFewColumns = Error("invalid file format: too few tab separated columns")
 )
+
+var encoding = base64.NewEncoding("+/0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") //nolint:gochecknoglobals,lll
 
 // StatsParser is used to parse wrstat stats files.
 type StatsParser struct {
@@ -156,7 +159,7 @@ func (p *StatsParser) decodePath(encodedPath []byte) bool {
 		}
 	}()
 
-	l, err := base64.StdEncoding.Decode(p.pathBuffer, encodedPath)
+	l, err := encoding.Decode(p.pathBuffer, encodedPath)
 	if err != nil {
 		p.error = ErrBadPath
 
