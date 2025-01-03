@@ -161,7 +161,7 @@ func parseStats(in io.ReadCloser, prefix string) error {
 
 	defer smOut.Close()
 
-	p := NewStatsParser(in)
+	p := NewStatsParser(in, prefix)
 
 	condarcSuffixBytes := []byte(condarcSuffix)
 	condaMetaSuffixBytes := []byte(condaMetaSuffix)

@@ -26,7 +26,9 @@ package main
 import (
 	"bufio"
 	"encoding/base64"
+	"fmt"
 	"io"
+	"os"
 )
 
 // Error is the type of the constant Err* variables.
@@ -38,7 +40,7 @@ func (e Error) Error() string { return string(e) }
 const (
 	fileType                   = byte('f')
 	maxLineLength              = 64 * 1024
-	maxBase64EncodedPathLength = 1024
+	maxBase64EncodedPathLength = 8 * 1024
 
 	ErrBadPath       = Error("invalid file format: path is not base64 encoded")
 	ErrTooFewColumns = Error("invalid file format: too few tab separated columns")
@@ -54,17 +56,20 @@ type StatsParser struct {
 	Path       []byte
 	EntryType  byte
 	error      error
+	lineNum    int
+	name       string
 }
 
 // NewStatsParser is used to create a new StatsParser, given uncompressed wrstat
 // stats data.
-func NewStatsParser(r io.Reader) *StatsParser {
+func NewStatsParser(r io.Reader, name string) *StatsParser {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, maxLineLength), maxLineLength)
 
 	return &StatsParser{
 		scanner:    scanner,
 		pathBuffer: make([]byte, base64.StdEncoding.DecodedLen(maxBase64EncodedPathLength)),
+		name:       name,
 	}
 }
 
@@ -87,6 +92,7 @@ func (p *StatsParser) Scan() bool {
 func (p *StatsParser) parseLine() bool {
 	p.lineBytes = p.scanner.Bytes()
 	p.lineLength = len(p.lineBytes)
+	p.lineNum++
 
 	if p.lineLength <= 1 {
 		return true
@@ -113,16 +119,6 @@ func (p *StatsParser) parseLine() bool {
 	return p.decodePath(encodedPath)
 }
 
-func (p *StatsParser) skipColumns2to7() bool {
-	for i := 0; i < 6; i++ {
-		if _, ok := p.parseNextColumn(); !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (p *StatsParser) parseNextColumn() ([]byte, bool) {
 	start := p.lineIndex
 
@@ -142,7 +138,24 @@ func (p *StatsParser) parseNextColumn() ([]byte, bool) {
 	return p.lineBytes[start:end], true
 }
 
+func (p *StatsParser) skipColumns2to7() bool {
+	for i := 0; i < 6; i++ {
+		if _, ok := p.parseNextColumn(); !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (p *StatsParser) decodePath(encodedPath []byte) bool {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Fprintf(os.Stderr, "line %d of %s has invalid path %s\n", p.lineNum, p.name, encodedPath)
+			os.Exit(1)
+		}
+	}()
+
 	l, err := base64.StdEncoding.Decode(p.pathBuffer, encodedPath)
 	if err != nil {
 		p.error = ErrBadPath
