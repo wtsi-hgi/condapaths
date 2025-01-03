@@ -32,7 +32,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const (
@@ -47,17 +46,16 @@ var singularitySuffixes = []string{".sif", ".simg", ".img"}
 
 const helpText = `condapaths parses wrstat stats.gz files quickly, in low mem.
 
-Provide a directory as an argument and it will parse the most recent stats.gz
-file inside.
+Provide one or more stats.gz files output by wrstat.
 
 It outputs files with one path per line:
-* <date>.condarc: paths where the file basename was ".condarc"
-* <date>.conda-meta: paths where the file basename was "history", in a directory
-                     named "conda-meta"
-* <date>.singularity: paths where the file basename suffix was one of ".sif",
-                      ".simg", and ".img"
+* <input prefix>.condarc: paths where the file basename was ".condarc"
+* <input prefix>.conda-meta: paths where the file basename was "history", in a
+                             directory named "conda-meta"
+* <input prefix>.singularity: paths where the file basename suffix was one of
+                              ".sif",  ".simg", and ".img"
 
-Usage: condapaths /wrstat/output/dir
+Usage: condapaths 20241222_mount.unique.stats.gz
 Options:
   -h          this help text
 `
@@ -73,25 +71,27 @@ func main() {
 	}
 
 	if flag.Arg(0) == "" {
-		exitHelp("ERROR: you must provide a wrstat output directory")
+		exitHelp("ERROR: you must provide at least 1 wrstat stats file")
 	}
 
-	statsPath, date, err := getLatestStatFile(flag.Arg(0))
-	if err != nil {
-		die(err)
-	}
+	for _, statsPath := range flag.Args() {
+		prefix, err := getPathPrefix(statsPath)
+		if err != nil {
+			die(err)
+		}
 
-	input, cleanup, err := decompress(statsPath)
-	if err != nil {
-		die(err)
-	}
+		input, cleanup, err := decompress(statsPath)
+		if err != nil {
+			die(err)
+		}
 
-	defer cleanup()
+		err = parseStats(input, prefix)
 
-	err = parseStats(input, date)
-	if err != nil {
 		cleanup()
-		die(err)
+
+		if err != nil {
+			die(err)
+		}
 	}
 }
 
@@ -108,38 +108,15 @@ func exitHelp(msg string) {
 	os.Exit(0)
 }
 
-func getLatestStatFile(dir string) (string, string, error) {
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return "", "", err
+func getPathPrefix(path string) (string, error) {
+	if !strings.HasSuffix(path, statsFileSuffix) {
+		return "", fmt.Errorf("path must end with %s", statsFileSuffix)
 	}
 
-	var latestFile os.DirEntry
-	var latestModTime time.Time
+	base := filepath.Base(path)
+	idx := strings.Index(base, ".")
 
-	for _, file := range files {
-		if file.IsDir() || !file.Type().IsRegular() || !strings.HasSuffix(file.Name(), statsFileSuffix) {
-			continue
-		}
-
-		info, err := file.Info()
-		if err != nil {
-			return "", "", err
-		}
-
-		if info.ModTime().After(latestModTime) {
-			latestModTime = info.ModTime()
-			latestFile = file
-		}
-	}
-
-	if latestFile == nil {
-		return "", "", fmt.Errorf("no stats file found in directory: %s", dir)
-	}
-
-	fileName := latestFile.Name()
-
-	return filepath.Join(dir, fileName), fileName[:8], nil
+	return base[:idx], nil
 }
 
 func decompress(path string) (io.ReadCloser, func() error, error) {
@@ -160,24 +137,24 @@ func decompress(path string) (io.ReadCloser, func() error, error) {
 	return stdout, cleanup, nil
 }
 
-func parseStats(in io.ReadCloser, date string) error {
+func parseStats(in io.ReadCloser, prefix string) error {
 	defer in.Close()
 
-	rcOut, err := os.Create(date + condarcSuffix)
+	rcOut, err := os.Create(prefix + condarcSuffix)
 	if err != nil {
 		return err
 	}
 
 	defer rcOut.Close()
 
-	cmOut, err := os.Create(date + condaMetaOutputSuffix)
+	cmOut, err := os.Create(prefix + condaMetaOutputSuffix)
 	if err != nil {
 		return err
 	}
 
 	defer cmOut.Close()
 
-	smOut, err := os.Create(date + singularityOutputSuffix)
+	smOut, err := os.Create(prefix + singularityOutputSuffix)
 	if err != nil {
 		return err
 	}
